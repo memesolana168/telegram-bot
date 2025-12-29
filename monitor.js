@@ -1,6 +1,7 @@
 // 引入必要的庫
 const { Connection, PublicKey } = require('@solana/web3.js');
 const TelegramBot = require('node-telegram-bot-api');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 // ================= 設定區 (建議放入 .env 檔案) =================
@@ -16,6 +17,7 @@ const TG_CHAT_ID = process.env.TG_CHAT_ID || 'YOUR_CHAT_ID';
 // 3. 監控的地址
 const TREASURY_ADDRESS = 'SACKKQcRPAVAMVXZNLyH9avG9sdfYW2iE3Nw2te7Lj7'; // 金庫
 const MINTER_ADDRESS = 'SACKsfkq2BoUELVv8PZ8LhnMfQ4rorFAJbCZWi6eVLQ';   // 發幣器
+const SACK_TOKEN_ADDRESS = 'Sack7bZAMtwVU1ceMwV6V293GXCyBtkhQNYYUGAWMqu'; // SACK 代幣地址
 
 // ===============================================================
 
@@ -26,11 +28,13 @@ const bot = new TelegramBot(TG_BOT_TOKEN, { polling: false }); // 我們只用�
 // 用來記錄最後處理過的交易簽名 (避免重複發送)
 let lastTreasurySig = null;
 let lastMinterSig = null;
+let lastSackTradeSig = null;
 
 console.log('🚀 Solana 監控機器人啟動中...');
 console.log(`🔗 連接節點: ${SOLANA_RPC_URL}`);
 console.log(`👀 監控金庫: ${TREASURY_ADDRESS}`);
 console.log(`👀 監控發幣: ${MINTER_ADDRESS}`);
+console.log(`👀 監控SACK交易: ${SACK_TOKEN_ADDRESS}`);
 
 // 輔助函式：發送 TG 訊息
 async function sendTelegramAlert(message) {
@@ -44,6 +48,24 @@ async function sendTelegramAlert(message) {
 
 // 輔助函式：縮短地址顯示
 const shortAddr = (addr) => `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+
+// 輔助函式：獲取 SOL 對 USDT 價格
+async function getSolPrice() {
+    try {
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+        if (!response.ok) {
+            throw new Error(`CoinGecko API Error: ${response.statusText}`);
+        }
+        const data = await response.json();
+        if (data.solana && data.solana.usd) {
+            return data.solana.usd;
+        }
+        return null;
+    } catch (error) {
+        console.error('⚠️ 無法獲取 SOL 價格:', error.message);
+        return null; // 發生錯誤時返回 null
+    }
+}
 
 // -------------------------------------------------------------
 // 核心邏輯 1: 監控金庫 (接收 SOL)
@@ -215,6 +237,133 @@ async function checkMinter() {
 }
 
 // -------------------------------------------------------------
+// 核心邏輯 3: 監控 SACK 代幣交易 (Swap)
+// -------------------------------------------------------------
+async function checkSackTrades() {
+    try {
+        console.log('🔄 檢查 SACK 交易...');
+        const pubKey = new PublicKey(SACK_TOKEN_ADDRESS);
+        const signatures = await connection.getSignaturesForAddress(pubKey, { limit: 10 });
+
+        if (signatures.length === 0) return;
+
+        if (!lastSackTradeSig) {
+            lastSackTradeSig = signatures[0].signature;
+            return;
+        }
+
+        const newSigs = [];
+        for (let sigInfo of signatures) {
+            if (sigInfo.signature === lastSackTradeSig) break;
+            newSigs.push(sigInfo);
+        }
+
+        if (newSigs.length === 0) return;
+
+        // 在處理交易前，先獲取一次 SOL 的價格
+        const solPrice = await getSolPrice();
+        if (!solPrice) {
+            console.error('無法獲取 SOL 價格，暫停處理 SACK 交易');
+            return;
+        }
+
+        // 從舊到新處理
+        for (let sigInfo of newSigs.reverse()) {
+             console.log(`🔍 檢測到 SACK 新交易: ${sigInfo.signature}`);
+             
+             const tx = await connection.getParsedTransaction(sigInfo.signature, {
+                maxSupportedTransactionVersion: 0
+             });
+
+             if (!tx || !tx.meta) continue;
+
+             const { meta, transaction } = tx;
+             const logMessages = meta.logMessages || [];
+             const payer = transaction.message.accountKeys[0].pubkey.toBase58(); // 付款人通常是交易發起者
+
+             let solAmount = 0;
+             let sackAmount = 0;
+
+             // --- 嘗試從日誌解析交易金額 (Raydium) ---
+             for (const log of logMessages) {
+                if (log.includes('Raydium') && log.includes('swap')) {
+                    const match = log.match(/"amount_in":(\d+),"amount_out":(\d+)/);
+                    if (match) {
+                        const amountIn = parseInt(match[1], 10);
+                        const amountOut = parseInt(match[2], 10);
+                        
+                        // 判斷哪個是 SOL，哪個是 SACK
+                        // 這裡需要看 pre/post token balance 來確定方向
+                        const tokenBalances = tx.meta.postTokenBalances.filter(tb => tb.owner === payer);
+                        
+                        if (tokenBalances.length > 0) {
+                            const sackBalance = tokenBalances.find(tb => tb.mint === SACK_TOKEN_ADDRESS);
+                            
+                            // 假設 amountIn 是 SOL (lamports), amountOut 是 SACK (token units)
+                            // 這是一個很強的假設，需要驗證
+                            // 更好的方法是看 preTokenBalances 和 postTokenBalances 的變化
+                        }
+                    }
+                }
+             }
+
+             // --- 更可靠的方法：直接分析餘額變化 ---
+             const preSolBalance = meta.preBalances[0]; // Payer's SOL balance
+             const postSolBalance = meta.postBalances[0];
+             const solDiff = (postSolBalance - preSolBalance) / 1e9; // 單位 SOL, 負數代表花費
+             
+             const accountIndex = transaction.message.accountKeys.findIndex(k => k.pubkey.toBase58() === payer);
+
+             // 找到 Payer 的 SACK 代幣帳戶
+             const sackTokenAccounts = meta.postTokenBalances.filter(tb => tb.owner === payer && tb.mint === SACK_TOKEN_ADDRESS);
+             
+             if (sackTokenAccounts.length === 0) continue; // Payer 沒有 SACK 帳戶，跳過
+
+             const sackTokenAccountIndex = sackTokenAccounts[0].accountIndex;
+             
+             const preSackBalanceInfo = meta.preTokenBalances.find(tb => tb.accountIndex === sackTokenAccountIndex);
+             const postSackBalanceInfo = meta.postTokenBalances.find(tb => tb.accountIndex === sackTokenAccountIndex);
+
+             const preSackAmount = preSackBalanceInfo ? parseFloat(preSackBalanceInfo.uiTokenAmount.uiAmountString) : 0;
+             const postSackAmount = postSackBalanceInfo ? parseFloat(postSackBalanceInfo.uiTokenAmount.uiAmountString) : 0;
+             
+             const sackDiff = postSackAmount - preSackAmount;
+
+             // 如果 SACK 餘額有變化，且 SOL 餘額也有變化，我們就認為這是一筆交易
+             if (sackDiff !== 0 && solDiff !== 0) {
+                const isBuy = sackDiff > 0; // SACK 增加是買入
+                
+                solAmount = Math.abs(solDiff);
+                sackAmount = Math.abs(sackDiff);
+
+                const usdValue = solAmount * solPrice;
+
+                const msg = `
+${isBuy ? '📈' : '📉'} <b>SACK ${isBuy ? '買入' : '賣出'}通知！</b>
+
+<b>玩家:</b> <a href="https://solscan.io/account/${payer}">${shortAddr(payer)}</a>
+<b>方向:</b> ${isBuy ? '買入 SACK' : '賣出 SACK'}
+<b>SACK 數量:</b> ${isBuy ? '+' : '-'}${sackAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+<b>SOL 金額:</b> ${isBuy ? '-' : '+'}${solAmount.toFixed(4)} SOL
+<b>價值:</b> ~$${usdValue.toFixed(2)} USD
+
+<b>交易:</b> <a href="https://solscan.io/tx/${sigInfo.signature}">Solscan Link</a>
+`;
+                await sendTelegramAlert(msg);
+             }
+        }
+
+        if (newSigs.length > 0) {
+            lastSackTradeSig = newSigs[newSigs.length - 1].signature;
+        }
+
+    } catch (error) {
+        console.error('⚠️ SACK 交易監控錯誤:', error.message);
+    }
+}
+
+
+// -------------------------------------------------------------
 // 主迴圈
 // -------------------------------------------------------------
 async function main() {
@@ -227,12 +376,16 @@ async function main() {
         const mSigs = await connection.getSignaturesForAddress(new PublicKey(MINTER_ADDRESS), { limit: 1 });
         if (mSigs.length > 0) lastMinterSig = mSigs[0].signature;
         
+        const sSigs = await connection.getSignaturesForAddress(new PublicKey(SACK_TOKEN_ADDRESS), { limit: 1 });
+        if (sSigs.length > 0) lastSackTradeSig = sSigs[0].signature;
+
         console.log('✅ 初始化完成，開始監控...');
         
         // 設定輪詢間隔 (例如每 10 秒檢查一次)
         setInterval(async () => {
             await checkTreasury();
             await checkMinter();
+            await checkSackTrades();
         }, 10000); // 10000 ms = 10秒
 
     } catch (e) {
