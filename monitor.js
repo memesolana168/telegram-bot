@@ -284,6 +284,12 @@ async function checkSackTrades() {
              const logMessages = meta.logMessages || [];
              const payer = transaction.message.accountKeys[0].pubkey.toBase58(); // 付款人通常是交易發起者
 
+             // 如果交易發起者是發幣器或金庫地址，則跳過，不視為買賣
+             if (payer === MINTER_ADDRESS || payer === TREASURY_ADDRESS) {
+                console.log(`ℹ️ 交易由內部地址 (${shortAddr(payer)}) 發起，已略過。`);
+                continue;
+             }
+
              let solAmount = 0;
              let sackAmount = 0;
 
