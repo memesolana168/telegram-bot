@@ -14,6 +14,9 @@ const SOLANA_RPC_URL = process.env.RPC_URL || 'https://api.mainnet-beta.solana.c
 const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const TG_CHAT_ID = process.env.TG_CHAT_ID || 'YOUR_CHAT_ID';
 
+// 4. 輪詢間隔 (單位: 毫秒)
+const POLLING_INTERVAL = parseInt(process.env.POLLING_INTERVAL || '60000', 10);
+
 // 3. 監控的地址
 const TREASURY_ADDRESS = 'SACKKQcRPAVAMVXZNLyH9avG9sdfYW2iE3Nw2te7Lj7'; // 金庫
 const MINTER_ADDRESS = 'SACKsfkq2BoUELVv8PZ8LhnMfQ4rorFAJbCZWi6eVLQ';   // 發幣器
@@ -381,12 +384,12 @@ async function main() {
 
         console.log('✅ 初始化完成，開始監控...');
         
-        // 設定輪詢間隔 (例如每 10 秒檢查一次)
+        // 設定輪詢間隔
         setInterval(async () => {
             await checkTreasury();
             await checkMinter();
             await checkSackTrades();
-        }, 10000); // 10000 ms = 10秒
+        }, POLLING_INTERVAL); // 使用可設定的輪詢間隔
 
     } catch (e) {
         console.error('初始化失敗:', e);
