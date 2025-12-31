@@ -45,7 +45,7 @@ async function sendTelegramAlert(message) {
         await bot.sendMessage(TG_CHAT_ID, message, { parse_mode: 'HTML', disable_web_page_preview: true });
         console.log('✅ TG 訊息已發送');
     } catch (error) {
-        console.error('❌ 發送 TG 失敗:', error.message);
+        console.error('❌ 發送 TG 失敗:', error);
     }
 }
 
