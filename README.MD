@@ -35,6 +35,14 @@ tasks: [
 ]
 ```
 
+#### 📌 監控模式 (`type`) 說明：
+| 模式 | 說明 | 適用場景 |
+| :--- | :--- | :--- |
+| `SOL_INFLOW` | **只監控轉入**。只有當該地址收到 SOL 時才會通知。 | 金庫、收款地址。 |
+| `SOL_TRANSFER` | **監控所有進出**。無論是收到還是轉出 SOL 都會通知。 | 巨鯨錢包、個人錢包追蹤。 |
+| `TOKEN_OUTFLOW` | **監控代幣發出**。追蹤該地址發放 SPL 代幣的行為。 | 發幣器 (Minter) 監控。 |
+| `SWAP` | **監控代幣交易**。追蹤特定代幣在 DEX 上的買賣行為。 | **地址須填寫代幣合約地址**。 |
+
 ### 第三步：設定 Telegram 與 RPC (Secrets)
 前往您的 GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions**，新增以下三個 **Repository secrets**：
 

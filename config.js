@@ -32,7 +32,7 @@ module.exports = {
             name: '📈 SACK 交易 (大額)',
             address: 'Sack7bZAMtwVU1ceMwV6V293GXCyBtkhQNYYUGAWMqu',
             type: 'SWAP',
-            minUSD: 100, // 只要改這裡：美金門檻
+            minUSD: 0, // 只要改這裡：美金門檻
         }
     ]
 };
