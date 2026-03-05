@@ -1,66 +1,81 @@
-Solana 地址監控機器人
+# 🚀 SACKbot - Solana 智能監控機器人 (v2.2)
 
-這是一個使用 Node.js 編寫的程式，用於監控指定的 Solana 地址異動，並透過 Telegram 發送通知。
+[English Version](./README.en.md) | 繁體中文
 
-功能
+SACKbot 是一個強大且易用的 Solana 區塊鏈監控工具。它可以追蹤特定錢包地址的 SOL 異動、代幣分發及 DEX 買賣行為，並即時推送到您的 Telegram 頻道。
 
-金庫監控: 當 SACK...Lj7 收到 SOL 時，通知來源地址與金額。
+## ✨ 核心特色
 
-發幣監控: 當 SACK...VLQ 進行發幣或轉幣操作時，通知代幣種類、數量與接收者。
+- 🛠️ **極簡配置**：只需在 `config.js` 一個地方設定所有監控任務。
+- 💰 **價值過濾**：支援自定義美金 (USD) 門檻，小額噪音自動過濾，大額轉帳精準捕捉。
+- ☁️ **零成本部署**：完美整合 GitHub Actions，無需伺服器即可 24/7 自動運行。
+- 🧠 **自動記憶**：利用 Git-as-DB 技術，Bot 會自動記錄監控進度，不漏報、不重複。
+- 📈 **多模式支援**：支援 SOL 轉帳、代幣發放、以及 Raydium/DEX 交易監控。
 
-前置準備
+---
 
-安裝 Node.js (建議版本 v16 以上)。
+## 🛠️ 快速開始 (GitHub Actions 部署)
 
-建立一個 Telegram Bot 並取得 Bot Token 與 Chat ID。
+這是最推薦的部署方式，完全免費且無需維護伺服器。
 
-(強烈建議) 申請一個免費的 Solana RPC URL (如 Helius 或 Alchemy)，因為公共節點很不穩定。
+### 第一步：Fork 或下載本專案
+將本專案 Fork 到您的 GitHub 帳號下。
 
-安裝步驟
+### 第二步：設定監控目標 (`config.js`)
+在 `config.js` 中填入您想監控的地址與美金門檻：
 
-下載本專案所有檔案到同一個資料夾。
+```javascript
+tasks: [
+  {
+    name: '🐋 巨鯨監控',
+    address: '錢包地址',
+    type: 'SOL_TRANSFER',
+    minUSD: 500, // 超過 500 美金才通知
+  }
+]
+```
 
-開啟終端機 (Terminal) 或命令提示字元 (CMD)，進入該資料夾。
+### 第三步：設定 Telegram 與 RPC (Secrets)
+前往您的 GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions**，新增以下三個 **Repository secrets**：
 
-安裝依賴套件：
+1.  `TG_BOT_TOKEN`: 您的 Telegram 機器人 Token。
+2.  `TG_CHAT_ID`: 接收通知的頻道或個人 ID。
+3.  `RPC_URL`: 建議使用 [Helius](https://www.helius.dev/) 或 [QuickNode](https://www.quicknode.com/) 的免費私有節點（公共節點易被擋）。
 
-npm install
+### 第四步：開啟寫入權限 (重要！)
+為了讓 Bot 能記錄進度，請務必：
+1. 前往 **Settings** -> **Actions** -> **General**。
+2. 滾動到最下方的 **Workflow permissions**。
+3. 勾選 **Read and write permissions** 並點擊 **Save**。
 
+---
 
-設定與執行
+## 🤖 如何取得 Telegram 設定？
 
-方法 A: 直接修改程式碼
+### 1. 取得 `TG_BOT_TOKEN`
+- 在 Telegram 搜尋並私訊 [@BotFather](https://t.me/botfather)。
+- 輸入 `/newbot`，按照指令設定名稱。
+- 完成後，您會得到一串像是 `123456:ABC-DEF...` 的字串，這就是您的 Token。
 
-打開 monitor.js，找到最上方的設定區，填入您的資訊：
+### 2. 取得 `TG_CHAT_ID`
+- 將您的機器人加入一個群組或頻道，並設定為管理員。
+- 發送一則訊息。
+- 搜尋並私訊 [@userinfobot](https://t.me/userinfobot) 或前往 `https://api.telegram.org/bot<您的TOKEN>/getUpdates` 尋找 `chat.id`。
 
-const SOLANA_RPC_URL = '您的 RPC URL'; // 例如 [https://mainnet.helius-rpc.com/](https://mainnet.helius-rpc.com/)...
-const TG_BOT_TOKEN = '您的 Telegram Bot Token';
-const TG_CHAT_ID = '您的 Chat ID';
+---
 
+## 💻 本地端執行 (Long-running)
 
-方法 B: 使用環境變數 (.env) - 推薦
+如果您希望獲得毫秒級的即時監控（而非 Actions 的 5 分鐘一次），可以在伺服器上長駐執行：
 
-在專案根目錄建立一個名為 .env 的檔案，填入內容：
+1. 安裝環境：`npm install`
+2. 複製 `.env.example` 為 `.env` 並填入資料。
+3. 啟動機器人：`npm start`
 
-RPC_URL=[https://api.mainnet-beta.solana.com](https://api.mainnet-beta.solana.com)
-TG_BOT_TOKEN=123456:ABC-DEF...
-TG_CHAT_ID=-100123456789
+---
 
+## 📜 授權協議
+本專案基於 MIT 協議開源。
 
-啟動程式
-
-npm start
-
-
-或是
-
-node monitor.js
-
-
-程式啟動後，當監控的地址發生交易時，您的 Telegram 就會收到通知。
-
-常見問題
-
-錯誤 429 Too Many Requests: 這表示您使用的 RPC 節點請求太頻繁。請將 monitor.js 中的輪詢時間 (setInterval) 從 10000 (10秒) 改長一點，或者使用付費/專屬的 RPC URL。
-
-沒有收到通知: 程式只會通知「新」的交易。請嘗試轉入極小額的 SOL (例如 0.001 SOL) 到金庫地址進行測試。
+---
+*由 Gemini 技術架構師 (Mentor) 精心設計*
