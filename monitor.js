@@ -177,6 +177,7 @@ class MonitorEngine {
         }
     }
 
+    // 1. 處理 SOL 轉帳
     async processSolTransfer(task, tx, signature, solPrice) {
         const accountIndex = tx.transaction.message.accountKeys.findIndex(k => k.pubkey.toBase58() === task.address);
         if (accountIndex === -1) return;
@@ -194,6 +195,7 @@ class MonitorEngine {
         await NotifyService.send(msg);
     }
 
+    // 2. 處理代幣發出
     async processTokenOutflow(task, tx, signature) {
         const preTokenBalances = tx.meta.preTokenBalances || [];
         const postTokenBalances = tx.meta.postTokenBalances || [];
@@ -204,7 +206,8 @@ class MonitorEngine {
             const postAmt = post.uiTokenAmount.uiAmount;
             if (postAmt > preAmt) {
                 const amount = postAmt - preAmt;
-                const msg = `<b>${task.name}</b>\n━━━━━━━━━━━━━━━━━━\n<b>行為:</b> 🏗️ 發放代幣\n<b>數量:</b> ${amount.toLocaleString()} ${post.mint.slice(0, 4)}...\n<b>接收者:</b> <code>${post.owner.slice(0, 4)}...${post.owner.slice(-4)}</code>\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
+                const tokenSymbol = task.name.replace(/[📈📉💰🖨️\s]/g, '') || post.mint.slice(0, 4);
+                const msg = `<b>${task.name}</b>\n━━━━━━━━━━━━━━━━━━\n<b>行為:</b> 🏗️ 發放代幣\n<b>數量:</b> ${amount.toLocaleString()} ${tokenSymbol}\n<b>接收者:</b> <code>${post.owner.slice(0, 4)}...${post.owner.slice(-4)}</code>\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
                 await NotifyService.send(msg);
             }
         }
@@ -215,7 +218,6 @@ class MonitorEngine {
         const payer = tx.transaction.message.accountKeys[0].pubkey.toBase58();
         const solDiff = (tx.meta.postBalances[0] - tx.meta.preBalances[0]) / 1e9;
         
-        // --- 精準判定：這是否為一筆 DEX 交易？ ---
         const DEX_PROGRAMS = [
             '675k1q2WmJAgD2uVPN87qc6pBaC46u7Z4j9fF974Wve', // Raydium
             'JUP6LkbZbjS1jKKpphs6U1f3pPs7d4YfB385yLq8B3r', // Jupiter
@@ -241,7 +243,8 @@ class MonitorEngine {
         if (task.minUSD > 0 && usdValue < task.minUSD) return;
 
         const isBuy = sackDiff > 0;
-        const msg = `<b>${isBuy ? '📈' : '📉'} ${task.name} ${isBuy ? '買入' : '賣出'}</b>\n━━━━━━━━━━━━━━━━━━\n<b>玩家:</b> <code>${payer.slice(0, 4)}...${payer.slice(-4)}</code>\n<b>數量:</b> ${Math.abs(sackDiff).toLocaleString()} ${task.name.replace(/[📈📉\s]/g, '')}\n<b>價值:</b> ${Math.abs(solDiff).toFixed(3)} SOL (~$${usdValue.toFixed(2)})\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
+        const tokenSymbol = task.name.replace(/[📈📉💰🖨️\s]/g, '') || 'Token';
+        const msg = `<b>${isBuy ? '📈' : '📉'} ${task.name} ${isBuy ? '買入' : '賣出'}</b>\n━━━━━━━━━━━━━━━━━━\n<b>玩家:</b> <code>${payer.slice(0, 4)}...${payer.slice(-4)}</code>\n<b>數量:</b> ${Math.abs(sackDiff).toLocaleString()} ${tokenSymbol}\n<b>價值:</b> ${Math.abs(solDiff).toFixed(3)} SOL (~$${usdValue.toFixed(2)})\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
         await NotifyService.send(msg);
     }
 }
