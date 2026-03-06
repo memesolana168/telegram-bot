@@ -26,7 +26,7 @@ module.exports = {
             address: 'Sack7bZAMtwVU1ceMwV6V293GXCyBtkhQNYYUGAWMqu',
             label: 'SACK 代幣',
             category: 'TOKEN',
-            silent: true,
+            silent: false,
             emoji: '💎'
         }
         // ,
