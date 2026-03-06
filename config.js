@@ -1,44 +1,69 @@
 /**
- * SACKbot 配置檔案
- * 這裡是唯一需要修改監控對象的地方
+ * SACKbot 配置檔案 (v2.3 智能地址簿版)
  */
 
 module.exports = {
-    // 輪詢間隔 (僅用於本地長駐模式，GitHub Actions 模式下不適用)
     interval: 60000,
 
-    // 內部地址標籤
-    internalAddresses: {
-        'SACKKQcRPAVAMVXZNLyH9avG9sdfYW2iE3Nw2te7Lj7': '金庫 (Treasury)',
-        'SACKsfkq2BoUELVv8PZ8LhnMfQ4rorFAJbCZWi6eVLQ': '發幣器 (Minter)',
-        'Sack7bZAMtwVU1ceMwV6V293GXCyBtkhQNYYUGAWMqu': 'SACK 代幣'
-    },
+    // 🏆 智能地址簿 (Address Book)
+    // 這裡定義了「熟人地址」，可以控制是否警報以及如何顯示
+    addressBook: [
+        {
+            address: 'SACKKQcRPAVAMVXZNLyH9avG9sdfYW2iE3Nw2te7Lj7',
+            label: '金庫 (Treasury)',
+            category: 'INTERNAL',
+            silent: true,      // true = 完全不發出通知 (安靜模式)
+            emoji: '🏦'
+        },
+        {
+            address: 'SACKsfkq2BoUELVv8PZ8LhnMfQ4rorFAJbCZWi6eVLQ',
+            label: '發幣器 (Minter)',
+            category: 'INTERNAL',
+            silent: false,     // false = 要通知，但會加上 [內部] 標籤
+            emoji: '🖨️'
+        },
+        {
+            address: 'Sack7bZAMtwVU1ceMwV6V293GXCyBtkhQNYYUGAWMqu',
+            label: 'SACK 代幣',
+            category: 'TOKEN',
+            silent: true,
+            emoji: '💎'
+        }
+        // ,
+        // {
+        //     address: '5sgFJxh1oewHjBvnkRY9qMau8pCLDfxCzFjCMJAGKke5',
+        //     label: '大莊家 A',
+        //     category: 'WHALE',
+        //     silent: false,
+        //     emoji: '🐋'
+        // }
+    ],
 
     // 監控任務清單
     tasks: [
         {
-            name: 'SACK金庫監控',
+            name: '💰 金庫監控',
             address: 'SACKKQcRPAVAMVXZNLyH9avG9sdfYW2iE3Nw2te7Lj7',
             type: 'SOL_INFLOW',
             minUSD: 0,
         },
         {
-            name: 'SACK發幣器動作',
+            name: '🖨️ 發幣器動作',
             address: 'SACKsfkq2BoUELVv8PZ8LhnMfQ4rorFAJbCZWi6eVLQ',
             type: 'TOKEN_OUTFLOW',
             minUSD: 0,
         },
         {
-            name: 'SACK 交易 ',
+            name: 'SACK 交易',
             address: 'Sack7bZAMtwVU1ceMwV6V293GXCyBtkhQNYYUGAWMqu',
             type: 'SWAP',
-            minUSD: 0, // 只要改這裡：美金門檻
+            minUSD: 0,
         },
         {
-            name: 'GEOD 交易 (大額)',
+            name: 'GEOD 交易',
             address: '5sgFJxh1oewHjBvnkRY9qMau8pCLDfxCzFjCMJAGKke5',
-            type: 'SOL_TRANSFER',
-            minUSD: 10, // 只要改這裡：美金門檻
-        },
+            type: 'SWAP',
+            minUSD: 20,
+        }
     ]
 };

@@ -22,15 +22,19 @@ This is the recommended deployment method—fully free and maintenance-free.
 Fork this repository to your GitHub account.
 
 ### Step 2: Configure Targets (`config.js`)
-Edit `config.js` to add your target addresses and USD thresholds:
+Edit `config.js` to add your target addresses and USD thresholds.
+
+#### 📖 Smart Address Book (`addressBook`)
+Define your "known entities" to add custom labels or silence specific wallets:
 
 ```javascript
-tasks: [
+addressBook: [
   {
-    name: '🐋 Whale Monitor',
-    address: 'Wallet_Address_Here',
-    type: 'SOL_TRANSFER',
-    minUSD: 500, // Notify only for transactions > $500
+    address: 'Wallet_Address',
+    label: 'My Wallet',
+    category: 'INTERNAL', // Categories: INTERNAL, WHALE, SPECIAL etc.
+    silent: true,        // true = Skip alerts; false = Show with labels
+    emoji: '👤'          // Custom Icon
   }
 ]
 ```

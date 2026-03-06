@@ -27,6 +27,20 @@ const connection = new Connection(ENV.rpcUrl, 'confirmed');
 
 // ================= 服務模組 =================
 
+const AddressBookService = {
+    get(address) {
+        const entry = CONFIG.addressBook.find(a => a.address === address);
+        if (!entry) return null;
+        return entry;
+    },
+    format(address) {
+        const entry = this.get(address);
+        if (!entry) return `<code>${address.slice(0, 4)}...${address.slice(-4)}</code>`;
+        const prefix = entry.category === 'INTERNAL' ? '[內部] ' : (entry.category === 'WHALE' ? '[巨鯨] ' : entry.category === 'SPECIAL' ? '[特殊] ' :  '');
+        return `<b>${prefix}${entry.emoji} ${entry.label}</b>`;
+    }
+};
+
 const StateService = {
     data: {},
     load() {
@@ -97,7 +111,6 @@ class MonitorEngine {
         StateService.load();
         await PriceService.updatePrice();
         
-        // 如果是長駐模式且沒有紀錄，先抓取初始值
         if (!IS_ACTIONS) {
             for (const task of CONFIG.tasks) {
                 if (!StateService.data[task.address]) {
@@ -120,7 +133,6 @@ class MonitorEngine {
             await this.processTask(task);
         }
 
-        // 如果在 Actions 模式下發現新交易，儲存狀態以便後續 Commit
         if (IS_ACTIONS && this.newSignaturesFound) {
             StateService.save();
         }
@@ -131,7 +143,6 @@ class MonitorEngine {
             const pubKey = new PublicKey(task.address);
             const lastSig = StateService.data[task.address];
             
-            // 增加 limit 到 100，以應對 GitHub Actions 可能長達一小時的延遲
             const signatures = await connection.getSignaturesForAddress(pubKey, { 
                 limit: 100,
                 until: lastSig
@@ -139,13 +150,10 @@ class MonitorEngine {
 
             if (signatures.length === 0) return;
 
-            // 更新最後處理的簽名 (抓取到的第一筆是最新的)
             StateService.data[task.address] = signatures[0].signature;
             this.newSignaturesFound = true;
 
-            // 從舊到新處理，確保通知順序正確
             const filteredSigs = signatures.reverse(); 
-
             console.log(`[Task] ${task.name} 檢測到 ${filteredSigs.length} 筆新交易 (已追蹤至 ${signatures[0].signature.slice(0, 8)}...)`);
 
             for (const sigInfo of filteredSigs) {
@@ -164,7 +172,13 @@ class MonitorEngine {
         if (!tx || !tx.meta) return;
 
         const payer = tx.transaction.message.accountKeys[0].pubkey.toBase58();
-        if (task.type === 'SWAP' && CONFIG.internalAddresses[payer]) return; 
+        
+        // --- 核心優化：檢查地址簿設定 ---
+        const payerInfo = AddressBookService.get(payer);
+        if (payerInfo && payerInfo.silent) {
+            // console.log(`[Engine] 略過靜音地址的操作: ${payerInfo.label}`);
+            return; 
+        }
 
         const solPrice = PriceService.solPrice;
 
@@ -190,8 +204,10 @@ class MonitorEngine {
         if (task.minUSD > 0 && usdValue < task.minUSD) return;
 
         const isIn = diff > 0;
-        const sender = tx.transaction.message.accountKeys[0].pubkey.toBase58();
-        const msg = `<b>${task.name}</b>\n━━━━━━━━━━━━━━━━━━\n<b>類型:</b> ${isIn ? '📥 收到 SOL' : '📤 支出 SOL'}\n<b>金額:</b> ${Math.abs(diff).toFixed(4)} SOL (~$${usdValue.toFixed(2)})\n<b>對手方:</b> <code>${sender.slice(0, 4)}...${sender.slice(-4)}</code>\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
+        const payer = tx.transaction.message.accountKeys[0].pubkey.toBase58();
+        const opponent = AddressBookService.format(payer);
+
+        const msg = `<b>${task.name}</b>\n━━━━━━━━━━━━━━━━━━\n<b>類型:</b> ${isIn ? '📥 收到 SOL' : '📤 支出 SOL'}\n<b>金額:</b> ${Math.abs(diff).toFixed(4)} SOL (~$${usdValue.toFixed(2)})\n<b>對手方:</b> ${opponent}\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
         await NotifyService.send(msg);
     }
 
@@ -207,7 +223,8 @@ class MonitorEngine {
             if (postAmt > preAmt) {
                 const amount = postAmt - preAmt;
                 const tokenSymbol = task.name.replace(/[📈📉💰🖨️\s]/g, '') || post.mint.slice(0, 4);
-                const msg = `<b>${task.name}</b>\n━━━━━━━━━━━━━━━━━━\n<b>行為:</b> 🏗️ 發放代幣\n<b>數量:</b> ${amount.toLocaleString()} ${tokenSymbol}\n<b>接收者:</b> <code>${post.owner.slice(0, 4)}...${post.owner.slice(-4)}</code>\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
+                const recipient = AddressBookService.format(post.owner);
+                const msg = `<b>${task.name}</b>\n━━━━━━━━━━━━━━━━━━\n<b>行為:</b> 🏗️ 發放代幣\n<b>數量:</b> ${amount.toLocaleString()} ${tokenSymbol}\n<b>接收者:</b> ${recipient}\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
                 await NotifyService.send(msg);
             }
         }
@@ -244,7 +261,9 @@ class MonitorEngine {
 
         const isBuy = sackDiff > 0;
         const tokenSymbol = task.name.replace(/[📈📉💰🖨️\s]/g, '') || 'Token';
-        const msg = `<b>${isBuy ? '📈' : '📉'} ${task.name} ${isBuy ? '買入' : '賣出'}</b>\n━━━━━━━━━━━━━━━━━━\n<b>玩家:</b> <code>${payer.slice(0, 4)}...${payer.slice(-4)}</code>\n<b>數量:</b> ${Math.abs(sackDiff).toLocaleString()} ${tokenSymbol}\n<b>價值:</b> ${Math.abs(solDiff).toFixed(3)} SOL (~$${usdValue.toFixed(2)})\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
+        const payerLabel = AddressBookService.format(payer);
+
+        const msg = `<b>${isBuy ? '📈' : '📉'} ${task.name} ${isBuy ? '買入' : '賣出'}</b>\n━━━━━━━━━━━━━━━━━━\n<b>玩家:</b> ${payerLabel}\n<b>數量:</b> ${Math.abs(sackDiff).toLocaleString()} ${tokenSymbol}\n<b>價值:</b> ${Math.abs(solDiff).toFixed(3)} SOL (~$${usdValue.toFixed(2)})\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
         await NotifyService.send(msg);
     }
 }
