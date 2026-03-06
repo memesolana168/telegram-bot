@@ -1,6 +1,6 @@
 /**
- * SACKbot - Solana 監控機器人 (GitHub Actions + Git-as-DB 版)
- * Mentor 觀點：利用 Git 本身來存放狀態，極致的低成本解決方案
+ * SACKbot - 通用型 Solana 監控引擎 (v2.4)
+ * Mentor 觀點：這是一個通用的監控框架，不限於任何特定代幣
  */
 
 const { Connection, PublicKey } = require('@solana/web3.js');
@@ -107,7 +107,7 @@ class MonitorEngine {
     }
 
     async init() {
-        console.log(`🚀 SACKbot 啟動... (${IS_ACTIONS ? 'Actions 模式' : '長駐模式'})`);
+        console.log(`🚀 Solana 監控引擎啟動... (${IS_ACTIONS ? 'Actions 模式' : '長駐模式'})`);
         StateService.load();
         await PriceService.updatePrice();
         
@@ -172,13 +172,8 @@ class MonitorEngine {
         if (!tx || !tx.meta) return;
 
         const payer = tx.transaction.message.accountKeys[0].pubkey.toBase58();
-        
-        // --- 核心優化：檢查地址簿設定 ---
         const payerInfo = AddressBookService.get(payer);
-        if (payerInfo && payerInfo.silent) {
-            // console.log(`[Engine] 略過靜音地址的操作: ${payerInfo.label}`);
-            return; 
-        }
+        if (payerInfo && payerInfo.silent) return; 
 
         const solPrice = PriceService.solPrice;
 
@@ -191,7 +186,6 @@ class MonitorEngine {
         }
     }
 
-    // 1. 處理 SOL 轉帳
     async processSolTransfer(task, tx, signature, solPrice) {
         const accountIndex = tx.transaction.message.accountKeys.findIndex(k => k.pubkey.toBase58() === task.address);
         if (accountIndex === -1) return;
@@ -211,7 +205,6 @@ class MonitorEngine {
         await NotifyService.send(msg);
     }
 
-    // 2. 處理代幣發出
     async processTokenOutflow(task, tx, signature) {
         const preTokenBalances = tx.meta.preTokenBalances || [];
         const postTokenBalances = tx.meta.postTokenBalances || [];
@@ -230,7 +223,6 @@ class MonitorEngine {
         }
     }
 
-    // 3. 處理 Swap (交易)
     async processSwap(task, tx, signature, solPrice) {
         const payer = tx.transaction.message.accountKeys[0].pubkey.toBase58();
         const solDiff = (tx.meta.postBalances[0] - tx.meta.preBalances[0]) / 1e9;
@@ -247,23 +239,32 @@ class MonitorEngine {
             DEX_PROGRAMS.includes(typeof k.pubkey === 'string' ? k.pubkey : k.pubkey.toBase58())
         );
 
-        if (!isDexTrade || Math.abs(solDiff) < 0.001) return;
+        if (!isDexTrade) return; 
 
-        const sackAccount = tx.meta.postTokenBalances.find(tb => tb.owner === payer && tb.mint === task.address);
-        if (!sackAccount) return;
-        const preSack = tx.meta.preTokenBalances.find(tb => tb.accountIndex === sackAccount.accountIndex);
-        const preAmt = preSack ? preSack.uiTokenAmount.uiAmount : 0;
-        const postAmt = sackAccount.uiTokenAmount.uiAmount;
-        const sackDiff = postAmt - preAmt;
-        if (sackDiff === 0) return;
+        let tokenDiff = 0;
+        const preTokenBalances = tx.meta.preTokenBalances || [];
+        const postTokenBalances = tx.meta.postTokenBalances || [];
+
+        for (const post of postTokenBalances) {
+            if (post.mint === task.address) {
+                const pre = preTokenBalances.find(p => p.accountIndex === post.accountIndex);
+                const preAmt = pre ? pre.uiTokenAmount.uiAmount : 0;
+                const postAmt = post.uiTokenAmount.uiAmount;
+                const diff = postAmt - preAmt;
+                if (Math.abs(diff) > Math.abs(tokenDiff)) tokenDiff = diff;
+            }
+        }
+
+        if (Math.abs(tokenDiff) < 0.000001) return;
+
         const usdValue = Math.abs(solDiff) * solPrice;
-        if (task.minUSD > 0 && usdValue < task.minUSD) return;
+        if (Math.abs(solDiff) > 0.005 && task.minUSD > 0 && usdValue < task.minUSD) return;
 
-        const isBuy = sackDiff > 0;
+        const isBuy = tokenDiff > 0;
         const tokenSymbol = task.name.replace(/[📈📉💰🖨️\s]/g, '') || 'Token';
         const payerLabel = AddressBookService.format(payer);
 
-        const msg = `<b>${isBuy ? '📈' : '📉'} ${task.name} ${isBuy ? '買入' : '賣出'}</b>\n━━━━━━━━━━━━━━━━━━\n<b>玩家:</b> ${payerLabel}\n<b>數量:</b> ${Math.abs(sackDiff).toLocaleString()} ${tokenSymbol}\n<b>價值:</b> ${Math.abs(solDiff).toFixed(3)} SOL (~$${usdValue.toFixed(2)})\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
+        const msg = `<b>${isBuy ? '📈' : '📉'} ${task.name} ${isBuy ? '買入' : '賣出'}</b>\n━━━━━━━━━━━━━━━━━━\n<b>玩家:</b> ${payerLabel}\n<b>數量:</b> ${Math.abs(tokenDiff).toLocaleString()} ${tokenSymbol}\n<b>對價:</b> ${Math.abs(solDiff) > 0.005 ? `${Math.abs(solDiff).toFixed(3)} SOL (~$${usdValue.toFixed(2)})` : '其他交易對'}\n<b>交易:</b> <a href="https://solscan.io/tx/${signature}">Solscan</a>`;
         await NotifyService.send(msg);
     }
 }

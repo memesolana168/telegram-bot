@@ -1,88 +1,68 @@
-# 🚀 SACKbot - Smart Solana Monitor (v2.2)
+# 🚀 SACKbot - Universal Solana Monitor Engine (v2.4)
 
-English | [繁體中文](./README.MD)
+English | [繁體中文](./README.md)
 
-SACKbot is a powerful and easy-to-use Solana blockchain monitoring tool. It tracks SOL movement, token distribution, and DEX trades (Buy/Sell) for specific wallet addresses and sends real-time alerts to your Telegram channel.
+SACKbot is a **universal** Solana blockchain monitoring tool. It is no longer limited to specific tokens. You can track Buy/Sell activities for **ANY** token or monitor fund movements for **ANY** wallet address with simple configurations.
 
 ## ✨ Core Features
 
-- 🛠️ **Minimalist Config**: Manage all monitoring tasks in a single file: `config.js`.
-- 💰 **Value Filtering**: Set custom USD thresholds to filter out dust and capture only high-value transfers.
-- ☁️ **Zero-Cost Deployment**: Seamlessly integrated with GitHub Actions—run 24/7 for free without any server.
-- 🧠 **Auto-Memory**: Uses Git-as-DB technology to automatically record scan progress, ensuring no missed or duplicate alerts.
-- 📈 **Multiple Modes**: Supports SOL transfers, Token distribution, and Raydium/DEX trade monitoring.
+- 🌍 **Universal Monitoring**: Supports all SPL Tokens and wallet addresses on the Solana blockchain.
+- 🛠️ **Unified Configuration**: Manage all targets, names, and thresholds in a single file: `config.js`.
+- 📖 **Smart Labeling**: Built-in "Address Book" to identify friends, internal wallets, or whales automatically.
+- 💰 **Value Filtering**: Set custom USD thresholds to filter out dust and focus on high-value transfers.
+- ☁️ **Zero-Cost Deployment**: Fully integrated with GitHub Actions—run 24/7 for free.
 
 ---
 
-## 🛠️ Quick Start (GitHub Actions Deployment)
+## 🛠️ Quick Start (GitHub Actions)
 
-This is the recommended deployment method—fully free and maintenance-free.
-
-### Step 1: Fork or Download
-Fork this repository to your GitHub account.
+### Step 1: Fork this Repository
+Fork this project to your GitHub account.
 
 ### Step 2: Configure Targets (`config.js`)
-Edit `config.js` to add your target addresses and USD thresholds.
-
-#### 📖 Smart Address Book (`addressBook`)
-Define your "known entities" to add custom labels or silence specific wallets:
+Open `config.js` and add any token or wallet you want to monitor:
 
 ```javascript
-addressBook: [
+tasks: [
   {
-    address: 'Wallet_Address',
-    label: 'My Wallet',
-    category: 'INTERNAL', // Categories: INTERNAL, WHALE, SPECIAL etc.
-    silent: true,        // true = Skip alerts; false = Show with labels
-    emoji: '👤'          // Custom Icon
+    name: '📈 My Token',      // Name to display in alerts
+    address: 'Mint_Address', // Token contract address
+    type: 'SWAP',            // Mode: DEX Trades
+    minUSD: 100,             // Threshold: Notify if > $100
+  },
+  {
+    name: '🐋 Whale Wallet', // Name to display
+    address: 'Wallet_Address', // Wallet address
+    type: 'SOL_TRANSFER',    // Mode: Monitor SOL movements
+    minUSD: 500,
   }
 ]
 ```
 
-#### 📌 Monitor Modes (`type`) Explained:
-| Mode | Description | Typical Use Case |
+#### 📌 Monitor Modes Explained:
+| Mode | Address Type Required | Description |
 | :--- | :--- | :--- |
-| `SOL_INFLOW` | **Only Incoming**. Notifies only when the address receives SOL. | Treasury, Payment addresses. |
-| `SOL_TRANSFER` | **All Transfers**. Notifies on both incoming and outgoing SOL. | Whale tracking, Personal wallet alerts. |
-| `TOKEN_OUTFLOW` | **Token Distribution**. Tracks outgoing SPL tokens from this address. | Minter wallet monitoring. |
-| `SWAP` | **Token Trades**. Tracks Buy/Sell on DEX (Raydium, etc.) | **Address must be the Token Contract Address**. |
+| `SWAP` | **Token Mint Address** | Tracks Buy/Sell on DEXs (Raydium, Jupiter, etc.). |
+| `SOL_TRANSFER`| **Wallet Address** | Tracks all incoming and outgoing SOL movements. |
+| `SOL_INFLOW` | **Wallet Address** | Tracks only incoming SOL (e.g., Treasury monitor). |
+| `TOKEN_OUTFLOW`| **Wallet Address** | Tracks any outgoing tokens (e.g., Minter monitor). |
 
-### Step 3: Set Secrets (Telegram & RPC)
-Go to your GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions**, and add these three **Repository secrets**:
-
-1.  `TG_BOT_TOKEN`: Your Telegram Bot Token.
-2.  `TG_CHAT_ID`: Your target Channel or Chat ID.
-3.  `RPC_URL`: Recommended to use private endpoints from [Helius](https://www.helius.dev/) or [QuickNode](https://www.quicknode.com/).
+### Step 3: Set GitHub Secrets
+Go to Repository **Settings** -> **Secrets and variables** -> **Actions**, add:
+- `TG_BOT_TOKEN`: Your Telegram Bot Token.
+- `TG_CHAT_ID`: Your Chat or Channel ID.
+- `RPC_URL`: Your Solana RPC URL (Helius/QuickNode recommended).
 
 ### Step 4: Enable Write Permissions (CRITICAL!)
-For the bot to record its progress, you MUST:
 1. Go to **Settings** -> **Actions** -> **General**.
-2. Scroll to the bottom to **Workflow permissions**.
+2. Scroll to **Workflow permissions**.
 3. Select **Read and write permissions** and click **Save**.
 
 ---
 
 ## 🤖 How to get Telegram Settings?
-
-### 1. Get `TG_BOT_TOKEN`
-- Search for [@BotFather](https://t.me/botfather) on Telegram.
-- Type `/newbot` and follow the instructions.
-- You will receive a token like `123456:ABC-DEF...`.
-
-### 2. Get `TG_CHAT_ID`
-- Add your bot to a group or channel as an admin.
-- Send a test message.
-- Search for [@userinfobot](https://t.me/userinfobot) or visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` to find the `chat.id`.
-
----
-
-## 💻 Local Execution (Long-running)
-
-If you prefer millisecond-level real-time monitoring:
-
-1. Setup: `npm install`
-2. Copy `.env.example` to `.env` and fill in your credentials.
-3. Start: `npm start`
+1. Message [@BotFather](https://t.me/botfather) and type `/newbot` to get your **Token**.
+2. Add the bot to your channel, send a message, then use [@userinfobot](https://t.me/userinfobot) to find your **Chat ID**.
 
 ---
 
