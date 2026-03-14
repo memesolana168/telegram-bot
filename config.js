@@ -69,7 +69,7 @@ module.exports = {
             name: 'GEOD 交易',
             address: '5sgFJxh1oewHjBvnkRY9qMau8pCLDfxCzFjCMJAGKke5',
             type: 'SOL_TRANSFER',
-            minUSD: 20,
+            minUSD: 100,
         }
     ]
 };
