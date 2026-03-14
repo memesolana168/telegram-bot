@@ -1,16 +1,16 @@
-# 🚀 SACKbot - Universal Solana Monitor Engine (v2.4)
+# 🚀 SACKbot - Ultimate Solana Monitor Engine (v2.6)
 
 English | [繁體中文](./README.md)
 
-SACKbot is a **universal** Solana blockchain monitoring tool. It is no longer limited to specific tokens. You can track Buy/Sell activities for **ANY** token or monitor fund movements for **ANY** wallet address with simple configurations.
+SACKbot is a **global tracking-capable** Solana blockchain monitoring tool. With the v2.6 core upgrade, it accurately captures trading activities for any token across the entire network, featuring intelligent value detection and high operational stability.
 
-## ✨ Core Features
+## ✨ Core Features (v2.6 Upgrade)
 
-- 🌍 **Universal Monitoring**: Supports all SPL Tokens and wallet addresses on the Solana blockchain.
-- 🛠️ **Unified Configuration**: Manage all targets, names, and thresholds in a single file: `config.js`.
-- 📖 **Smart Labeling**: Built-in "Address Book" to identify friends, internal wallets, or whales automatically.
-- 💰 **Value Filtering**: Set custom USD thresholds to filter out dust and focus on high-value transfers.
-- ☁️ **Zero-Cost Deployment**: Fully integrated with GitHub Actions—run 24/7 for free.
+- 🌍 **Global Mint Monitoring**: Just provide the Token Mint Address to automatically track trades on all DEXs including Raydium, Jupiter, Pump.fun, and more.
+- 💎 **Multi-Asset Detection**: Automatically identifies changes in WSOL, USDC, USDT, and native SOL to precisely calculate the USD value of every transaction.
+- 🎯 **Payer-Oriented Locking**: By tracking the balance changes of the transaction initiator (Payer), it accurately determines "Buy" or "Sell" actions, avoiding confusion from pool balance shifts.
+- 🛠️ **Smart Address Book**: Built-in labeling system to identify internal wallets, whales, or special accounts automatically.
+- 🛡️ **Robust Runtime**: Automatically detects and skips invalid Base58 addresses with comprehensive error handling to ensure 24/7 uninterrupted monitoring.
 
 ---
 
@@ -20,38 +20,38 @@ SACKbot is a **universal** Solana blockchain monitoring tool. It is no longer li
 Fork this project to your GitHub account.
 
 ### Step 2: Configure Targets (`config.js`)
-Open `config.js` and add any token or wallet you want to monitor:
+Configure tokens or wallets you want to monitor in `config.js`:
 
 ```javascript
 tasks: [
   {
-    name: '📈 My Token',      // Name to display in alerts
-    address: 'Mint_Address', // Token contract address
-    type: 'SWAP',            // Mode: DEX Trades
-    minUSD: 100,             // Threshold: Notify if > $100
+    name: '📈 SACK Token',     // Display name for alerts
+    address: 'Mint_Address',  // Token Mint Address (Global tracking)
+    type: 'SWAP',             // Mode: DEX Trade Detection
+    minUSD: 100,              // Threshold: Notify if > $100
   },
   {
-    name: '🐋 Whale Wallet', // Name to display
-    address: 'Wallet_Address', // Wallet address
-    type: 'SOL_TRANSFER',    // Mode: Monitor SOL movements
-    minUSD: 500,
+    name: '🏦 Treasury',       // Display name
+    address: 'Wallet_Address',// Wallet address
+    type: 'SOL_INFLOW',       // Mode: Monitor incoming SOL only
+    minUSD: 10,               // USD filter
   }
 ]
 ```
 
 #### 📌 Monitor Modes Explained:
-| Mode | Address Type Required | Description |
+| Mode | Recommended Address Type | Description |
 | :--- | :--- | :--- |
-| `SWAP` | **Token Mint Address** | Tracks Buy/Sell on DEXs (Raydium, Jupiter, etc.). |
-| `SOL_TRANSFER`| **Wallet Address** | Tracks all incoming and outgoing SOL movements. |
-| `SOL_INFLOW` | **Wallet Address** | Tracks only incoming SOL (e.g., Treasury monitor). |
-| `TOKEN_OUTFLOW`| **Wallet Address** | Tracks any outgoing tokens (e.g., Minter monitor). |
+| **`SWAP`** | **Token Mint Address** | **[Highly Recommended]** Tracks all Buy/Sell activities for this token across the entire network. |
+| **`SOL_TRANSFER`**| **Wallet Address** | Tracks all incoming and outgoing SOL movements (including fees). |
+| **`SOL_INFLOW`** | **Wallet Address** | Focuses on when the wallet **receives** SOL. |
+| **`TOKEN_OUTFLOW`**| **Wallet Address** | Tracks when the wallet **sends** tokens (useful for minters/team wallets). |
 
 ### Step 3: Set GitHub Secrets
 Go to Repository **Settings** -> **Secrets and variables** -> **Actions**, add:
 - `TG_BOT_TOKEN`: Your Telegram Bot Token.
 - `TG_CHAT_ID`: Your Chat or Channel ID.
-- `RPC_URL`: Your Solana RPC URL (Helius/QuickNode recommended).
+- `RPC_URL`: Your Solana RPC URL (Helius/QuickNode/Triton recommended).
 
 ### Step 4: Enable Write Permissions (CRITICAL!)
 1. Go to **Settings** -> **Actions** -> **General**.
@@ -60,9 +60,11 @@ Go to Repository **Settings** -> **Secrets and variables** -> **Actions**, add:
 
 ---
 
-## 🤖 How to get Telegram Settings?
-1. Message [@BotFather](https://t.me/botfather) and type `/newbot` to get your **Token**.
-2. Add the bot to your channel, send a message, then use [@userinfobot](https://t.me/userinfobot) to find your **Chat ID**.
+## 🤖 FAQ
+- **Q: Why am I not receiving notifications?**  
+  Check if `minUSD` is set too high or if your RPC node is experiencing lag.
+- **Q: What happens if I enter an incorrect address?**  
+  v2.6 automatically detects and skips invalid addresses during startup and logs a warning, preventing the bot from crashing.
 
 ---
 
